@@ -1,7 +1,7 @@
 === Post Type Spotlight ===
 Contributors: desrosj, linchpin_agency
 Tags: featured, post type, sticky, posts, custom post types
-Requires at least: 3.1.0
+Requires at least: 3.1
 Tested up to: 3.5.2
 Stable tag: 1.0
 License: GPLv2 or later
@@ -19,7 +19,7 @@ When a post is designated as featured:
 *   Shows featured posts as such in the post type's admin screen
 *   Stores a post meta field, '_pts_featured_post', which can be used to query featured posts.
 
-*Note: For the plugin to work on attachments, you must be using 3.5 or above. All other features will work on 3.1.0 and up.*
+*Note: For the plugin to work on the core attachment post type, you must be using 3.5 or above. All other features will work on 3.1 and up.*
 
 == Installation ==
 
