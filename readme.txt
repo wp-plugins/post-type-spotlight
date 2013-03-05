@@ -1,5 +1,5 @@
 === Post Type Spotlight ===
-Contributors: desrosj, linchpin_agency
+Contributors: linchpin_agency, desrosj
 Tags: featured, post type, sticky, posts, custom post types
 Requires at least: 3.1
 Tested up to: 3.5.2
