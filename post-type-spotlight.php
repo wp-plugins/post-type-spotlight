@@ -1,11 +1,11 @@
 <?php
 /*
 Plugin Name: Post Type Spotlight
-Plugin URI: http://wordpress.org/extend/plugins/
-Description: Allows admin chosen post types to have a featured post check box on the edit screen. Also adds appropriate classes to front end post display, and allows featured posts to be queried via a post meta field.
-Version: 1.1
+Plugin URI: https://wordpress.org/plugins/post-type-spotlight/
+Description: Allows admin chosen post types to have a featured post check box on the edit screen. Also adds appropriate classes to front end post display, and allows featured posts to be queried via a taxonomy query.
+Version: 2.0.0
 Author: Linchpin
-Author URI: http://linchpinagency.com
+Author URI: http://linchpin.agency/?utm_source=post-type-spotlight&utm_medium=plugin-admin-page&utm_campaign=wp-plugin
 License: GPLv2
 */
 
@@ -16,6 +16,8 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 	 */
 	class Post_Type_Spotlight {
 
+		private $doing_upgrades;
+
 		/**
 		 * __construct function.
 		 *
@@ -23,13 +25,50 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @return void
 		 */
 		function __construct() {
-			add_action( 'admin_init', array( $this, 'admin_init' ) );
-			add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
-			add_action( 'save_post', array( $this, 'save_post' ) );
+			add_action( 'init',            array( $this, 'init' ) );
+			add_action( 'widgets_init',    array( $this, 'widgets_init' ) );
+			add_action( 'admin_init',      array( $this, 'admin_init' ) );
+			add_action( 'add_meta_boxes',  array( $this, 'add_meta_boxes' ) );
+			add_action( 'save_post',       array( $this, 'save_post' ) );
 			add_action( 'edit_attachment', array( $this, 'save_post' ) );
-			add_action( 'pre_get_posts', array( $this, 'pre_get_posts' ) );
+			add_action( 'pre_get_posts',   array( $this, 'pre_get_posts' ), 999 );
 
-			add_filter( 'post_class', array( $this, 'post_class' ), 10, 3 );
+			add_filter( 'post_class',      array( $this, 'post_class' ), 10, 3 );
+
+			$this->doing_upgrades = false;
+		}
+
+		/**
+		 * init function.
+		 *
+		 * @access public
+		 * @return void
+		 */
+		function init() {
+			$post_types = get_option( 'pts_featured_post_types_settings', array() );
+
+			if ( ! empty( $post_types ) ) {
+				register_taxonomy( 'pts_feature_tax', $post_types, array(
+					'hierarchical' => false,
+					'show_ui' => false,
+					'query_var' => true,
+					'rewrite' => false,
+					'show_admin_column' => false,
+				) );
+			}
+		}
+
+		/**
+		 * widgets_init function.
+		 *
+		 * @access public
+		 * @return void
+		 */
+		function widgets_init() {
+			include_once( plugin_dir_path( __FILE__ ) . '/pts-featured-posts-widget.php' );
+
+			if ( class_exists( 'PTS_Featured_Posts_Widget' ) )
+				register_widget( 'PTS_Featured_Posts_Widget' );
 		}
 
 		/**
@@ -39,7 +78,9 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @return void
 		 */
 		function admin_init() {
-			register_setting( 'pts_featured_post_types_settings', 'pts_featured_post_types_settings', array( $this, 'sanitize_settings' ) );
+			$this->check_for_updates();
+
+			register_setting( 'writing', 'pts_featured_post_types_settings', array( $this, 'sanitize_settings' ) );
 
 			//add a section for the plugin's settings on the writing page
 			add_settings_section( 'pts_featured_posts_settings_section', 'Featured Post Types', array( $this, 'settings_section_text' ), 'writing' );
@@ -58,13 +99,60 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 
 			if ( $featured_pts = get_option( 'pts_featured_post_types_settings' ) ) {
 				foreach ( $featured_pts as $pt ) {
-					add_action( 'manage_' . $pt . '_posts_columns', array( $this, 'manage_posts_columns' ), 10 );
-					add_action( 'manage_' . $pt . '_posts_custom_column' , array( $this, 'manage_posts_custom_column' ), 10, 2 );
-					add_filter( 'views_edit-' . $pt, array( $this, 'views_addition' ) );
+					if ( 'attachment' == $pt ) {
+						add_filter( 'manage_media_columns', array( $this, 'manage_posts_columns' ), 999 );
+						add_action( 'manage_media_custom_column' , array( $this, 'manage_posts_custom_column' ), 10, 2 );
+					} else {
+						add_filter( 'manage_' . $pt . '_posts_columns', array( $this, 'manage_posts_columns' ), 999 );
+						add_action( 'manage_' . $pt . '_posts_custom_column' , array( $this, 'manage_posts_custom_column' ), 10, 2 );
+						add_filter( 'views_edit-' . $pt, array( $this, 'views_addition' ) );
+					}
 				}
 			}
+		}
 
+		/**
+		 * Check if there are any updates to perform.
+		 *
+		 * @access public
+		 * @return void
+		 */
+		function check_for_updates() {
+			$version = get_option( 'pts_version' );
 
+			//If there is no version, it is a version 2.0 upgrade
+			if ( empty( $version ) && ! $this->doing_upgrades ) {
+
+				$this->doing_upgrades = true;
+
+				$args = array(
+					'post_type' => get_post_types(),
+					'posts_per_page' => 100,
+					'offset' => 0,
+					'post_status' => 'any',
+					'meta_query' => array(
+			            array(
+			                'key' => '_pts_featured_post',
+			            )
+			        ),
+			        'cache_results' => false,
+				);
+				$featured_posts = new WP_Query( $args );
+
+				while ( $featured_posts->have_posts() ) {
+					foreach ( $featured_posts->posts as $post ) {
+						wp_set_object_terms( $post->ID, array( 'featured' ), 'pts_feature_tax', false );
+						delete_post_meta( $post->ID, '_pts_featured_post' );
+					}
+
+					$args['offset'] = $args['offset'] + $args['posts_per_page'];
+					$featured_posts = new WP_Query( $args );
+				}
+
+				update_option( 'pts_version', '2.0.0' );
+
+				$this->doing_upgrades = false;
+			}
 		}
 
 		/**
@@ -74,8 +162,9 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @return void
 		 */
 		function settings_section_text() {
+			global $new_whitelist_options;
+
 			echo "<p>Select which post types can be featured.</p>";
-			settings_fields( 'pts_featured_post_types_settings' );
 		}
 
 		/**
@@ -107,8 +196,9 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 			$new_input = array();
 
 			foreach ( $input as $pt ) {
-				if ( post_type_exists( sanitize_text_field( $pt ) ) )
+				if ( post_type_exists( sanitize_text_field( $pt ) ) ) {
 					$new_input[] = sanitize_text_field( $pt );
+				}
 			}
 
 			return $new_input;
@@ -149,7 +239,7 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 			wp_nonce_field( '_pts_featured_post_nonce', '_pts_featured_post_noncename' );
 			?>
 			<div class="misc-pub-section lp-featured-post">
-				<span><?php echo apply_filters( 'pts_featured_checkbox_text', 'Feature this ' . $pt->labels->singular_name . ':', $post ); ?></span>&nbsp;<input type="checkbox" name="_pts_featured_post" id="_pts_featured_post" <?php checked( get_post_meta( $post->ID, '_pts_featured_post', true ) ); ?> />
+				<span><?php echo apply_filters( 'pts_featured_checkbox_text', 'Feature this ' . $pt->labels->singular_name . ':', $post ); ?></span>&nbsp;<input type="checkbox" name="_pts_featured_post" id="_pts_featured_post" <?php checked( has_term( 'featured', 'pts_feature_tax', $post->ID ) ); ?> />
 			</div>
 			<?php
 		}
@@ -175,8 +265,8 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		function manage_posts_custom_column( $column, $post_id ) {
 			switch ( $column ) {
 				case 'lp-featured':
-					if ( get_post_meta( $post_id, '_pts_featured_post', true ) )
-						echo '<span style="font-size:24px;">&#10030;</span>';
+					if ( has_term( 'featured', 'pts_feature_tax', $post_id ) )
+						echo '<span class="dashicons dashicons-star-filled"></span>';
 					break;
 			}
 		}
@@ -187,18 +277,32 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @access public
 		 * @return void
 		 */
-		function pre_get_posts() {
+		function pre_get_posts( $query ) {
 
-			if ( ! is_admin() )
+			if ( $this->doing_upgrades ) {
 				return;
+			}
 
-			global $pagenow;
+			$version = get_option( 'pts_version' );
 
-			if ( $pagenow != 'edit.php' || ! isset( $_GET['meta_key'] ) )
+			if ( empty( $version ) || version_compare( $version, '2.0.0' ) == -1 ) {
 				return;
+			}
 
-			global $wp_query;
-			$wp_query->query_vars['meta_key'] = sanitize_text_field( $_GET['meta_key'] );
+			if ( isset( $query->query_vars['meta_query'] ) ) {
+				foreach ( $query->query_vars['meta_query'] as $key => $meta_query ) {
+					if ( '_pts_featured_post' == $meta_query['key'] ) {
+						$query->query_vars['tax_query'][] = array(
+							'taxonomy' => 'pts_feature_tax',
+							'field' => 'slug',
+							'terms' => array( 'featured' ),
+						);
+
+						unset( $query->query_vars['meta_query'][ $key ] );
+						_deprecated_argument( 'WP_Query()', '2.0 of the Post Type Spotlight plugin', 'The _pts_featured_post post meta field has been removed. Please see https://wordpress.org/plugins/post-type-spotlight/faq/ for more info.' );
+					}
+				}
+			}
 		}
 
 		/**
@@ -209,14 +313,26 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @return void
 		 */
 		function views_addition( $views ) {
-			if ( $featured = get_posts( array( 'post_type' => get_post_type(), 'meta_key' => '_pts_featured_post' ) ) )
-				$count = count( $featured );
+			$featured = new WP_Query( array(
+				'post_type' => get_post_type(),
+				'posts_per_page' => 1,
+				'tax_query' => array(
+					array(
+						'taxonomy' => 'pts_feature_tax',
+						'field' => 'slug',
+						'terms' => array( 'featured' ),
+					)
+				),
+			) );
+
+			if ( $featured->have_posts() )
+				$count = $featured->found_posts;
 			else
 				$count = 0;
 
-			$link = '<a href="edit.php?post_type=' . get_post_type() . '&meta_key=_pts_featured_post"';
+			$link = '<a href="edit.php?post_type=' . get_post_type() . '&pts_feature_tax=featured"';
 
-			if ( isset( $_GET['meta_key'] ) && $_GET['meta_key'] == '_pts_featured_post' )
+			if ( isset( $_GET['pts_feature_tax'] ) && $_GET['pts_feature_tax'] == 'featured' )
 				$link .= ' class="current"';
 
 			$link .= '>Featured</a> <span class="count">(' . $count . ')</span>';
@@ -242,10 +358,13 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 
 			if ( isset( $_POST['_pts_featured_post_noncename'] ) && wp_verify_nonce( $_POST['_pts_featured_post_noncename'], '_pts_featured_post_nonce' ) ) {
 
-				if ( isset( $_POST['_pts_featured_post'] ) && ! empty( $_POST['_pts_featured_post'] ) )
-					update_post_meta( $post_id, '_pts_featured_post', 1 );
-				else
+				if ( isset( $_POST['_pts_featured_post'] ) && ! empty( $_POST['_pts_featured_post'] ) ) {
 					delete_post_meta( $post_id, '_pts_featured_post' );
+					wp_set_object_terms( $post_id, array( 'featured' ), 'pts_feature_tax', false );
+				} else {
+					delete_post_meta( $post_id, '_pts_featured_post' );
+					wp_set_object_terms( $post_id, null, 'pts_feature_tax', false );
+				}
 			}
 		}
 
@@ -259,9 +378,9 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 		 * @return void
 		 */
 		function post_class( $classes, $class, $post_id ) {
-			if ( get_post_meta( $post_id, '_pts_featured_post', true ) ) {
+			if ( has_term( 'featured', 'pts_feature_tax', $post_id ) ) {
 				$classes[] = 'featured';
-				$classes[] = 'featured-' . get_post_type();
+				$classes[] = 'featured-' . get_post_type( $post_id );
 			}
 
 			return $classes;

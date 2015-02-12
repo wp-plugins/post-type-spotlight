@@ -1,9 +1,9 @@
 === Post Type Spotlight ===
-Contributors: linchpin_agency, desrosj
+Contributors: desrosj, linchpin_agency
 Tags: featured, post type, sticky, posts, custom post types
-Requires at least: 3.1
-Tested up to: 3.5.2
-Stable tag: 1.1
+Requires at least: 3.1.0
+Tested up to: 4.1
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,9 +17,9 @@ When a post is designated as featured:
 
 *   It receives 'featured' and 'featured-$posttype' classes via the post_class filter.
 *   Shows featured posts as such in the post type's admin screen
-*   Stores a post meta field, '_pts_featured_post', which can be used to query featured posts.
+*   Assigns a post a hidden taxonomy term (featured) that can easily be queried.
 
-*Note: For the plugin to work on the core attachment post type, you must be using 3.5 or above. All other features will work on 3.1 and up.*
+*Note: For the plugin to work on attachments, you must be using 3.5 or above. All other features will work on 3.1.0 and up.*
 
 == Installation ==
 
@@ -40,9 +40,11 @@ This snippet of code will fetch the 10 most recent posts that are featured.
 	$featured_posts = new WP_Query( array(
 		'post_type' => 'post',
 		'posts_per_page' => 10,
-		'meta_query' => array(
+		‘tax_query’ => array(
 			array(
-				'key' => '_pts_featured_post'
+				‘taxonomy’ => ‘pts_feature_tax’,
+				'field' => 'slug',
+				'terms' => array( 'featured' ),
 			)
 		)
 	) );
@@ -59,16 +61,16 @@ This snippet of code will fetch the 10 most recent posts that are featured.
 1. The settings page.
 2. Options on the edit screen
 3. Markup example when using post_class();
-4. Something you can do with a featured post.
-5. Shows featured posts in post edit tables.
+4. Shows featured posts in post edit tables.
 
 == Changelog ==
-
-= 1.1 =
-* Added the pts_featured_checkbox_text filter to the text to the left of the checkbox.
-
-= 1.0.1 =
-* The plugin should only allow public post types to be checked off on the settings page.
+= 2.0 =
+* Changing how featured posts are designated. Instead of post meta, the plugin now uses a hidden taxonomy.
+* Added a widget for showing featured posts.
+* Fixed the post_class filter to work properly on secondary loops.
+* Fixed bug where the featured column would not show when viewing Media in the admin with list view.
+* Fixed bug where saving settings did not always work.
+* Changed the featured star in the admin to use the WordPress Dashicon font.
 
 = 1.0 =
 * Hello world!
