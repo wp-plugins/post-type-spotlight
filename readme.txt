@@ -40,9 +40,9 @@ This snippet of code will fetch the 10 most recent posts that are featured.
 	$featured_posts = new WP_Query( array(
 		'post_type' => 'post',
 		'posts_per_page' => 10,
-		‘tax_query’ => array(
+		'tax_query' => array(
 			array(
-				‘taxonomy’ => ‘pts_feature_tax’,
+				'taxonomy' => 'pts_feature_tax',
 				'field' => 'slug',
 				'terms' => array( 'featured' ),
 			)
