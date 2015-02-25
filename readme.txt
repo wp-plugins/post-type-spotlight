@@ -3,7 +3,7 @@ Contributors: desrosj, linchpin_agency
 Tags: featured, post type, sticky, posts, custom post types
 Requires at least: 3.1.0
 Tested up to: 4.1
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -40,9 +40,9 @@ This snippet of code will fetch the 10 most recent posts that are featured.
 	$featured_posts = new WP_Query( array(
 		'post_type' => 'post',
 		'posts_per_page' => 10,
-		'tax_query' => array(
+		‘tax_query’ => array(
 			array(
-				'taxonomy' => 'pts_feature_tax',
+				‘taxonomy’ => ‘pts_feature_tax’,
 				'field' => 'slug',
 				'terms' => array( 'featured' ),
 			)
@@ -64,6 +64,9 @@ This snippet of code will fetch the 10 most recent posts that are featured.
 4. Shows featured posts in post edit tables.
 
 == Changelog ==
+= 2.1 =
+* Don’t erase other terms in the pts_feature_tax assigned to the post on save. This opens up potential to have more than one type of “featured”, (e.g. recommended).
+
 = 2.0 =
 * Changing how featured posts are designated. Instead of post meta, the plugin now uses a hidden taxonomy.
 * Added a widget for showing featured posts.

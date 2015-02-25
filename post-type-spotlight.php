@@ -3,7 +3,7 @@
 Plugin Name: Post Type Spotlight
 Plugin URI: https://wordpress.org/plugins/post-type-spotlight/
 Description: Allows admin chosen post types to have a featured post check box on the edit screen. Also adds appropriate classes to front end post display, and allows featured posts to be queried via a taxonomy query.
-Version: 2.0.0
+Version: 2.1.0
 Author: Linchpin
 Author URI: http://linchpin.agency/?utm_source=post-type-spotlight&utm_medium=plugin-admin-page&utm_campaign=wp-plugin
 License: GPLv2
@@ -360,10 +360,21 @@ if ( ! class_exists( 'Post_Type_Spotlight' ) ) {
 
 				if ( isset( $_POST['_pts_featured_post'] ) && ! empty( $_POST['_pts_featured_post'] ) ) {
 					delete_post_meta( $post_id, '_pts_featured_post' );
-					wp_set_object_terms( $post_id, array( 'featured' ), 'pts_feature_tax', false );
+					wp_set_object_terms( $post_id, array( 'featured' ), 'pts_feature_tax', true );
 				} else {
 					delete_post_meta( $post_id, '_pts_featured_post' );
-					wp_set_object_terms( $post_id, null, 'pts_feature_tax', false );
+
+					$current_terms = wp_get_object_terms( $post_id, 'pts_feature_tax', array( 'fields' => 'slugs' ) );
+
+					if ( ( $key = array_search( 'featured', $current_terms ) ) !== false ) {
+						unset( $current_terms[ $key ] );
+					}
+
+					if ( empty( $current_terms ) || is_wp_error( $current_terms ) ) {
+						wp_set_object_terms( $post_id, null, 'pts_feature_tax', false );
+					} else {
+						wp_set_object_terms( $post_id, $current_terms, 'pts_feature_tax', false );
+					}
 				}
 			}
 		}
