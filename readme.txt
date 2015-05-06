@@ -2,7 +2,7 @@
 Contributors: desrosj, linchpin_agency
 Tags: featured, post type, sticky, posts, custom post types
 Requires at least: 3.1.0
-Tested up to: 4.1
+Tested up to: 4.2.1
 Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
